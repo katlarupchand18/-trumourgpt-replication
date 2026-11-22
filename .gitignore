@@ -1,0 +1,41 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*.json
+*service-account*.json
+
+# Python
+.venv/
+.venv*/
+venv/
+venv*/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# macOS
+.DS_Store
+
+# Generated outputs
+logs/
+results/
+experiments/reports/
+experiments/results/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Large model artifacts
+models/
+*.safetensors
+*.gguf
+*.bin
+
+# Colab notebook outputs
+.ipynb_checkpoints/

@@ -1,0 +1,243 @@
+# TrumorGPT Configuration
+# IEEE Paper: "TrumorGPT: Graph-Based Retrieval-Augmented LLM for Fact-Checking"
+
+# =============================================================================
+# LLM Configuration (Ollama + Gemini)
+# =============================================================================
+llm:
+  provider: "ollama"
+  base_url: "http://localhost:11434"
+  model: "llama3.2:3b"
+  embedding_model: "nomic-embed-text:latest"
+
+  # Gemini configuration
+  gemini_model: "gemini-3.5-flash"
+
+  # Generation parameters
+  temperature: 0.0
+  top_p: 0.9
+  top_k: 40
+  num_predict: 2048
+  num_ctx: 8192
+
+  # Reliability
+  timeout_seconds: 120
+  max_retries: 3
+  retry_backoff_factor: 2.0
+
+  # Structured output
+  use_json_format: true
+  json_schema_validation: true
+
+# =============================================================================
+# Embedding Configuration
+# =============================================================================
+embeddings:
+  provider: "ollama"
+  model: "nomic-embed-text:latest"
+  batch_size: 32
+  normalize: true
+  cache_dir: "data/cache/embeddings"
+  dimension: 768
+
+# =============================================================================
+# Topic Modeling (LDA) Configuration
+# =============================================================================
+topic_modeling:
+  # Paper specifies: health-related corpus, sentence-level LDA
+  num_topics: 20
+  alpha: "auto"  # Dirichlet prior for document-topic
+  eta: "auto"    # Dirichlet prior for topic-word
+  iterations: 1000
+  passes: 10
+  random_state: 42
+  min_df: 5
+  max_df: 0.95
+
+  # Corpus settings
+  corpus_source: "pubmed_abstracts"  # Options: pubmed_abstracts, wikipedia_health, combined
+  corpus_path: "data/corpus/health_corpus.txt"
+  model_path: "data/cache/lda_model"
+
+  # Health topic identification (Paper: α=1.5 for health topics)
+  health_topic_keywords: [
+    "health", "medical", "medicine", "disease", "pandemic", "epidemic",
+    "virus", "vaccine", "treatment", "therapy", "diagnosis", "symptom",
+    "patient", "hospital", "doctor", "nurse", "clinical", "trial",
+    "drug", "pharmaceutical", "fda", "cdc", "who", "public health",
+    "covid", "coronavirus", "sars", "infection", "immunity", "antibody"
+  ]
+  health_topic_boost: 1.5  # Paper's α parameter
+
+# =============================================================================
+# Topic-Enhanced Sentence Centrality (Paper Section III-B)
+# =============================================================================
+sentence_centrality:
+  # Paper: η = 0.7 (weight for BERT vs LDA)
+  eta: 0.7
+
+  # Graph construction
+  similarity_threshold: 0.1  # Minimum cosine similarity for edge
+  max_edges_per_node: 50     # Sparsity control
+
+  # PageRank parameters
+  pagerank_alpha: 0.85       # Damping factor
+  pagerank_max_iter: 100
+  pagerank_tol: 1e-6
+
+  # Output
+  top_k_sentences: 10
+
+# =============================================================================
+# Topic-Specific TextRank (Paper Section III-C)
+# =============================================================================
+topic_textrank:
+  # Paper parameters
+  damping_factor: 0.85
+  max_iterations: 500
+  convergence_tol: 1e-6
+
+  # Health topic boost (Paper: α = 1.5)
+  health_topic_boost: 1.5
+
+  # Graph construction
+  similarity_threshold: 0.1
+
+  # Output
+  top_k_keywords: 20
+
+# =============================================================================
+# Knowledge Graph Configuration
+# =============================================================================
+knowledge_graph:
+  # Graph backend
+  backend: "networkx"
+  storage_path: "data/cache/knowledge_graph"
+
+  # Entity types (health domain)
+  entity_types: [
+    "DISEASE", "MEDICATION", "VACCINE", "HEALTH_ORGANIZATION",
+    "PUBLIC_POLICY", "MEDICAL_CONDITION", "QUANTITY", "DATE", "LOCATION"
+  ]
+
+  # Relation types
+  relation_types: [
+    "causes", "prevents", "treats", "increases", "decreases",
+    "associated_with", "approved_by", "recommended_by", "contradicts"
+  ]
+
+  # Extraction settings
+  few_shot_examples: 5
+  max_triples_per_claim: 50
+
+  # Quality filters
+  min_confidence: 0.5
+  deduplicate: true
+
+# =============================================================================
+# GraphRAG Retrieval Configuration (Paper Section III-E)
+# =============================================================================
+graphrag:
+  # Jaccard similarity (Paper Equation 5)
+  use_weighted_jaccard: false
+  weight_by_centrality: false
+
+  # Retrieval
+  top_k_graphs: 5
+  similarity_threshold: 0.005
+
+  # Knowledge base
+  dbpedia_path: "data/dbpedia/health_triples.nt"
+  dbpedia_filter_keywords: [
+    "health", "medical", "medicine", "disease", "pandemic", "epidemic",
+    "virus", "vaccine", "treatment", "therapy", "hospital", "clinical"
+  ]
+
+# =============================================================================
+# Fact Verification Configuration
+# =============================================================================
+verification:
+  # Verdict labels (Paper: TRUE, FALSE, UNDETERMINED)
+  labels: ["TRUE", "FALSE", "UNDETERMINED"]
+
+  # Few-shot examples for verification
+  few_shot_examples: 3
+
+  # Evidence handling
+  max_evidence_passages: 10
+  max_evidence_tokens: 4000
+
+  # Negation and temporal awareness
+  check_negation: true
+  check_temporal: true
+  check_numerical: true
+
+# =============================================================================
+# Dataset Configuration (Paper Section IV-B)
+# =============================================================================
+dataset:
+  # PolitiFact binary mapping (Paper)
+  label_mapping:
+    "TRUE": ["True", "Mostly True", "Half True"]
+    "FALSE": ["Mostly False", "False", "Pants on Fire"]
+
+  # Target: 600 claims (300 TRUE, 300 FALSE)
+  target_size: 600
+  true_count: 300
+  false_count: 300
+
+  # Categories (Paper: "Health Care" and "Coronavirus")
+  categories: ["Health Care", "Coronavirus"]
+
+  # Splits (leakage prevention)
+  splits:
+    dev: 100
+    val: 100
+    test: 400
+
+  # Paths
+  raw_path: "data/raw/politifact_claims.json"
+  processed_path: "data/processed/politifact_processed.json"
+  splits_path: "data/processed/splits.json"
+
+# =============================================================================
+# Evaluation Configuration
+# =============================================================================
+evaluation:
+  metrics: ["accuracy", "precision", "recall", "f1", "confusion_matrix"]
+
+  # Per-class metrics
+  per_class_metrics: true
+
+  # Confidence intervals
+  confidence_level: 0.95
+  bootstrap_samples: 1000
+
+  # Output
+  results_dir: "experiments/results"
+  save_predictions: true
+  save_error_analysis: true
+
+# =============================================================================
+# Experiment Tracking
+# =============================================================================
+experiment:
+  name: "trumourgpt_replication"
+  track_api_usage: true
+  track_tokens: true
+  track_latency: true
+  checkpoint_interval: 50
+
+  # Reproducibility
+  seed: 42
+  deterministic: true
+
+# =============================================================================
+# Logging
+# =============================================================================
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}"
+  file: "logs/trumourgpt.log"
+  rotation: "10 MB"
+  retention: "7 days"
